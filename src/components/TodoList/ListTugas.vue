@@ -1,0 +1,279 @@
+<template>
+    <v-main class="list">
+        <h3 class="text-h3 font-weight-medium mb-5">To Do List</h3>
+        
+        <v-card>
+            <v-card-title>
+                <v-text-field
+                    v-model="search"
+                    append-icon="mdi-magnify"
+                    label="Search"
+                    single-line
+                    hide-details
+                ></v-text-field>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" dark @click="historyDialog = true">
+                    History TODO
+                </v-btn>
+                <v-btn color="success" dark @click="dialog = true">
+                    Tambah
+                </v-btn>
+            </v-card-title>
+            <v-data-table :headers="headers" :items="todos" :search="search">
+                <template v-slot:[`item.actions`]="{ item }">
+                    <v-icon icon color = "blue" small class="mr-2" @click="editItem(item)" > 
+                        mdi-pencil
+                    </v-icon>
+                    <v-icon icon color = "red" small @click="deleteItem(item)">
+                        mdi-delete
+                    </v-icon>
+                </template>
+                <template v-slot:[`item.checked`]="{ item }">
+                    <v-checkbox small class="mr-2" multiple :key="item" @click.capture.stop="checkedItem(item)" > </v-checkbox>
+                </template>
+                
+            </v-data-table>
+        </v-card>
+
+        <v-dialog v-model="historyDialog" persistent max-width="600px">
+            <v-card>
+                <v-data-table :headers="headers" :items="history" :search="search"></v-data-table>
+                <v-spacer></v-spacer>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="blue darken-1" text @click="cancel">
+                        Cancel
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+ 
+        <v-dialog v-model="dialog" persistent max-width="600px">
+            <v-card>
+                <v-card-title>
+                    <span class="headline">Form Todo</span>
+                </v-card-title>
+                <v-card-text>
+                    <v-container>
+                        <v-text-field
+                            v-model="formTodo.task"
+                            label="Task"
+                            required
+                        ></v-text-field>
+ 
+                        <v-select
+                            v-model="formTodo.priority"
+                            :items="['Penting', 'Biasa', 'Tidak penting']"
+                            label="Priority"
+                            required
+                        ></v-select>
+                        
+                        <v-textarea
+                            v-model="formTodo.note"
+                            label="Note"
+                            required
+                        ></v-textarea>
+                    </v-container>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="blue darken-1" text @click="cancel">
+                        Cancel
+                    </v-btn>
+                    <v-btn color="blue darken-1" text @click="save">
+                        Save
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="deleteDialog" persistent max-width="350px">
+            <v-card>
+                <v-card-title>
+                    <p>Yakin ingin menghapus?</p>
+                </v-card-title>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="red" text @click="deleteFromDialog"> Ya </v-btn>
+                    <v-btn color="green" text @click="cancel"> Tidak </v-btn>            
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="updateDialog" persistent max-width="600px">
+            <v-card>
+                <v-card-title>
+                    <span class="headline">Edit Todo</span>
+                </v-card-title>
+                <v-card-text>
+                    <v-container>
+                        <v-text-field
+                            v-model="formTodo.task"
+                            label="Task"
+                            required
+                        ></v-text-field>
+ 
+                        <v-select
+                            v-model="formTodo.priority"
+                            :items="['Penting', 'Biasa', 'Tidak penting']"
+                            label="Priority"
+                            required
+                        ></v-select>
+                        
+                        <v-textarea
+                            v-model="formTodo.note"
+                            label="Note"
+                            required
+                        ></v-textarea>
+                    </v-container>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="blue darken-1" text @click="cancel">
+                        Cancel
+                    </v-btn>
+                    <v-btn color="blue darken-1" text @click="editFromDialog">
+                        Save
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="deleteSelectedDialog" persistent max-width="350px" >
+            <v-card>
+                <v-card-title>
+                    <p>Yakin ingin menghapus item?</p>
+                </v-card-title>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn color="red" text @click="deleteCheckedItem"> Ya </v-btn>
+                    <v-btn color="green" text @click="cancel"> Tidak </v-btn>            
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <v-card class="mt-5" v-if="check.length">
+            <v-data-table :headers="headers" :items="check" :search="search"></v-data-table>
+            <v-spacer></v-spacer>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn color="blue darken-1" text @click="deleteSelectedDialog = true">
+                    Delete
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+
+        
+
+    </v-main>
+</template>
+
+<script>
+export default {
+    name: "List",
+    data() {
+        return {
+            search: null,
+            dialog: false,
+            historyDialog: false,
+            updateDialog: false,
+            deleteSelectedDialog: false,
+
+            headers: [
+                {
+                    text: "Task",
+                    align: "start",
+                    sortable: true,
+                    value: "task",
+                },
+                { text: "Priority", value: "priority" },
+                { text: "Note", value: "note" },
+                { text: "Actions", value: "actions" },
+                { text: "", value: "checked"},
+            ],
+            todos: [
+                {
+                    task: "bernafas",
+                    priority: "Penting",
+                    note: "huffttt",
+                },
+                {
+                    task: "nongkrong",
+                    priority: "Tidak penting",
+                    note: "bersama tman2",
+                },
+                {
+                    task: "masak",
+                    priority: "Biasa",
+                    note: "masak air 500ml",
+                },
+            ],
+            history: [
+        
+            ],
+            check: [
+        
+            ],
+            formTodo: {
+                task: null,
+                priority: null,
+                note: null,
+            },
+        };
+    },
+    methods: {
+        save() {
+            this.todos.push(this.formTodo);
+            this.resetForm();
+            this.dialog = false;
+        },
+        cancel() {
+            this.resetForm();
+            this.dialog = false;
+            this.updateDialog = false;
+            this.deleteDialog = false;
+            this.historyDialog= false;
+            this.deleteSelectedDialog= false;
+        },
+        resetForm() {
+            this.formTodo = {
+                task: null,
+                priority: null,
+                note: null,
+            };
+        },
+        deleteItem(item){
+            this.deleteDialog = true
+            this.formTodo = item
+        },
+        deleteFromDialog(){
+            this.deleteDialog = false;   
+            this.history.push(this.formTodo);
+            this.todos.splice(this.todos.indexOf(this.formTodo), 1);
+        },
+        editItem(item){
+            this.updateDialog = true
+            this.formTodo = item
+        },
+        editFromDialog(){         
+            this.todos[this.todos.indexOf(this.formTodo)].task = this.formTodo.task;
+            this.todos[this.todos.indexOf(this.formTodo)].priority = this.formTodo.priority;
+            this.todos[this.todos.indexOf(this.formTodo)].note = this.formTodo.note;  
+            this.updateDialog = false;       
+        },
+        checkedItem(item){
+            this.deleteSelectedDialog = false
+            this.check.push(item);
+        },
+        deleteCheckedItem(){
+            for( var i=0 ; i<this.check.length ; i++){
+                const index = this.todos.indexOf(this.check[i])
+                this.history.push(this.check[i])
+                this.todos.splice(index, 1);
+            }
+            this.check=[];
+            this.deleteSelectedDialog = false;
+        },
+    },
+};
+</script>
